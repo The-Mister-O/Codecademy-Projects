@@ -1,0 +1,153 @@
+import codecademylib3_seaborn
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+
+
+#Import the data sheet for evaluation
+
+
+ts = pd.read_csv('tennis_stats.csv')
+
+
+
+#seperate the data into reasonable shards
+
+
+x_id = ts[['Player', 'Year']]
+
+x_all = ts[['FirstServe','FirstServePointsWon','FirstServeReturnPointsWon',
+'SecondServePointsWon','SecondServeReturnPointsWon','Aces',
+'BreakPointsConverted','BreakPointsFaced','BreakPointsOpportunities',
+'BreakPointsSaved','DoubleFaults','ReturnGamesPlayed','ReturnGamesWon',
+'ReturnPointsWon','ServiceGamesPlayed','ServiceGamesWon','TotalPointsWon',
+'TotalServicePointsWon']]
+
+y_outcome = ts[['Wins', 'Losses', 'Winnings']]
+
+
+
+#In the following section a simple linear regression algorithm calculates the R^2-score 
+#of every single feature with their respective plots in relation to the 'Winnings'
+#outcome and saves it into a sorted dictionary from strongest to weakest single feature.
+#The following programm will focus exclusively on the 'Winnings' outcomes and will decide, 
+#which features maximise the score for this specific outcome
+
+
+
+single_feature_scores_winnings = {}
+for stringX in x_all:
+  X = x_all[[stringX]]
+  y = y_outcome['Winnings']
+
+  x_train, x_test, y_train, y_test = train_test_split(X, y, train_size = 0.8, test_size = 0.2, random_state=27)
+  lr = LinearRegression()
+  lr.fit(x_train, y_train)
+  score = lr.score(x_test, y_test)
+  single_feature_scores_winnings[score] = stringX
+
+  summary, plots = plt.subplots(ncols=2, figsize=(10,5), sharex = True, sharey = True)
+
+  plots[0].scatter(x_train, y_train, label = 'Training data points')
+  plots[0].plot(
+              x_train, 
+              lr.predict(x_train),
+              linewidth = 3,
+              color='tab:orange',
+              label='Model predictions'
+              )
+  plots[0].set(xlabel='Predicted outcome', ylabel='Outcome', title='Train Set')
+  plots[0].legend()
+
+  plots[1].scatter(x_test, y_test, label='Test data points')
+  plots[1].plot(x_test, lr.predict(x_test), linewidth=3, color='tab:orange', label='Model predictions')
+  plots[1].set(xlabel='Feature', ylabel='Outcome', title='Test set')
+  plots[1].legend()
+
+  score = lr.score(x_test, y_test)
+  summary.suptitle('Train score  ' + str(score) + '  X: ' + stringX + '   y:  Winnings')
+
+  plt.show()
+
+sorted_single_feature_scores_winnings = dict(sorted(single_feature_scores_winnings.items(), reverse = True))
+print('Single feature scores:\n\n')
+# for key,value in sorted_single_feature_scores_winnings.items():
+#   print('Score: ' + str(key) + ' to feature: ' + str(value))
+
+
+#As given by the task, a 2-feature linear regression is performed, to find the best combination 
+#of features for the machine learning algorithm. To compare every feature against another, a list
+#is created to enable indexing, to prevent double entries and saved into a dictionary which is 
+#sorted by the end to see which 2 features performed best 
+
+
+two_features_scores_winnings = {}
+
+list_x = list(x_all)
+i = 1
+for stringX in list_x:
+  if i > len(list_x):
+    break
+  for stringX2 in list_x[i:]:
+    y = y_outcome['Winnings']
+    X = x_all[[stringX, stringX2]]
+  
+    x_train, x_test, y_train, y_test = train_test_split(X, y, train_size = 0.8, test_size = 0.2, random_state=27)
+    lr = LinearRegression()
+    lr.fit(x_train, y_train)
+    score = lr.score(x_test, y_test)
+    two_features_scores_winnings[score] = [stringX, stringX2]
+  i += 1
+
+print('\n\nTwo feature scores:\n\n')
+
+sorted_two_features_scores_winnings = dict(sorted(two_features_scores_winnings.items(), reverse = True))
+# for key,value in sorted_two_features_scores_winnings.items():
+#   print('Score: ' + str(key) + ' to features: ' + str(value))
+
+
+#In this part multiple features are tested trough a powerset. To keep the runtime reasonable 
+#the strongest features (R^2 > 0.5) are separated from the weakest features (R^2 < 0.5), then
+#the strongest features are tested against all weak features. As this is
+#the beginning of my ML/AI journey, multicollinearity is no taken into account. 
+  
+#defining the power set function and 2 lists with strong and weak features
+def powerset(s):
+  if not s:
+    return[set()]
+  else:
+    rest = powerset(s[1:])
+    return rest + [{s[0]} | x for x in rest]
+
+strong_feature_list = []
+weak_feature_list = []
+
+for key,value in single_feature_scores_winnings.items():
+  if key > 0.5:
+    strong_feature_list.append(value)
+  else:
+    weak_feature_list.append(value)
+
+weak_feature_power_set = powerset(weak_feature_list)
+
+multiple_features_score_winnings = {}
+
+for stringX in weak_feature_power_set:
+    if len(stringX) < 1:
+      continue
+    y = y_outcome['Winnings']
+    X = x_all[strong_feature_list + list(stringX)]
+
+    x_train, x_test, y_train, y_test = train_test_split(X, y, train_size = 0.8, test_size = 0.2, random_state=6)
+    lr = LinearRegression()
+    lr.fit(x_train, y_train)
+    score = lr.score(x_test, y_test)
+    multiple_features_score_winnings[score] = strong_feature_list + list(stringX)
+
+print('\n\nMultiple feature scores:\n\n')
+
+sorted_multiple_features_score_winnings = dict(sorted(multiple_features_score_winnings.items(), reverse = True))
+for key,value in sorted_multiple_features_score_winnings.items():
+  print('Score: ' + str(key) + ' to features: ' + str(value))
